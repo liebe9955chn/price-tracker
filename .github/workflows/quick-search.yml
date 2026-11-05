@@ -1,0 +1,47 @@
+name: 臨時比價
+
+on:
+  workflow_dispatch:
+    inputs:
+      keyword:
+        description: "要查的商品（書可以填 ISBN）"
+        required: true
+      must:
+        description: "標題一定要有的字（可不填，用空白分開）"
+        required: false
+        default: ""
+      exclude:
+        description: "要排除的字（可不填，用空白分開）"
+        required: false
+        default: ""
+      include_used:
+        description: "二手也要看"
+        type: boolean
+        default: false
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: 查價格並傳到 Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          KEYWORD: ${{ inputs.keyword }}
+          MUST: ${{ inputs.must }}
+          EXCLUDE: ${{ inputs.exclude }}
+          INCLUDE_USED: ${{ inputs.include_used }}
+        run: |
+          ARGS=()
+          if [ "$INCLUDE_USED" = "true" ]; then ARGS+=(--all); fi
+          python -m pricewatch.quick "$KEYWORD" --must "$MUST" --exclude "$EXCLUDE" "${ARGS[@]}"
