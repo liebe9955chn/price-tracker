@@ -1,0 +1,141 @@
+# ============================================================
+#  商品追蹤清單（要新增商品，只要改這個檔案）
+# ============================================================
+#
+# 新增商品最簡單的寫法（複製一段貼在最後面，改內容）：
+#
+#   - name: 顯示名稱
+#     category: 樂高           ← 樂高、漫畫、保養品、3C 選一個
+#     keywords: ["搜尋關鍵字"]
+#     must_include: ["型號"]   ← 標題一定要出現的字
+#     original_price: 定價     ← 漫畫一定要填；保養品、3C 可以不填
+#                               樂高可以不填，程式會自動查必買站標的原價
+#                               （查不到時 Telegram 會提醒你補填）
+#
+# 其他可以加的欄位（不填就用類別的預設值）：
+#   must_include_any  標題「至少要有一個」的字
+#   exclude           這個商品額外要排除的字（會跟類別的排除字合併）
+#   target_price      價格小於等於這個數字就通知
+#   min_price / max_price  合理價格範圍，範圍外的直接忽略
+#
+# 注意：每一行前面的空白數量要跟範例一樣，不能用 Tab 鍵。
+
+# 所有商品都會排除的字
+global_exclude:
+  - 高仿
+  - 平替
+  - 相容
+  - 兼容
+  - 適用樂高
+  - 適用於樂高
+  - 非樂高
+  - 類樂高
+  - 仿樂高
+  - 副廠
+
+# ------------------------------------------------------------
+#  類別規則
+# ------------------------------------------------------------
+# rule: discount  用「原價打幾折」判斷（ratio 0.70 = 7 折）
+#   inclusive: false 代表不含（低於 7 折才算），true 代表含（6.5 折也算）
+# rule: baseline  用「過去 30 天的一般價格」判斷
+#   learn_days  剛開始追蹤的前幾天只記錄、不通知
+#   drop_pct    比一般價格便宜多少（0.15 = 15%）就通知
+# min_ratio / max_ratio  價格低於原價的幾成、高於原價幾倍就忽略（擋零件、周邊、亂標價）
+categories:
+  樂高:
+    rule: discount
+    tiers:
+      - {ratio: 0.70, inclusive: false, label: 甜蜜點}
+      - {ratio: 0.65, inclusive: true, label: 超甜價}
+    must_include_any: ["樂高", "LEGO"]
+    exclude: [
+      # 周邊、零件、組合包
+      "拆賣", "拆售", "展示盒", "收納盒", "防塵罩", "亞克力", "壓克力", "燈光", "LED", "燈組",
+      "說明書", "抱枕", "改裝", "同捆", "+", "鑰匙圈", "缺件", "散件", "裸件", "無盒",
+      # 已拆封、組過
+      "已拆", "已組", "組裝完成", "拼好",
+      # 疑似非正版（中國用語、仿品常見寫法）
+      "小人仔", "人仔", "旂艦", "官方旗艦店", "塑料", "拼裝", "拼插", "顆粒", "益智", "pcs",
+      "CATTYLEGO", "貓咪樂購", "樂拼", "樂積木"]
+    # 二手只收「未拆」的（盒損可以）
+    used_words: ["二手", "中古", "拆封", "九成新", "9成新", "95新"]
+    used_ok_words: ["未拆"]
+    # 標題出現超過幾個「其他型號」就不採用（一個賣場賣好幾款，標價不一定是這款）
+    max_other_models: 1
+    min_ratio: 0.4
+    max_ratio: 3
+
+  漫畫:
+    rule: discount
+    tiers:
+      - {ratio: 0.85, inclusive: true, label: 好價}
+    exclude: ["電子書", "電子版", "Kobo", "Readmoo", "Pubu", "eBook", "BOOK☆WALKER", "出租"]
+    # 標題有二手字眼的不抓，除非同時有「狀況很好」的字眼
+    used_words: ["二手", "中古", "舊書"]
+    used_ok_words: ["未拆", "未拆封", "膜", "書況佳", "書況良好", "9成新", "九成新", "95新", "近全新", "全新"]
+    min_ratio: 0.3
+    max_ratio: 2
+
+  保養品:
+    rule: baseline
+    learn_days: 14
+    window_days: 30
+    drop_pct: 0.15
+
+  3C:
+    rule: baseline
+    learn_days: 14
+    window_days: 30
+    drop_pct: 0.10
+
+# ------------------------------------------------------------
+#  追蹤的商品
+# ------------------------------------------------------------
+products:
+  - name: LEGO 40817 黃色行李箱
+    category: 樂高
+    keywords: ["樂高 40817", "LEGO 40817"]
+    must_include: ["40817"]
+    original_price: 549
+
+  - name: LEGO 11390 七龍珠 神龍與悟空
+    category: 樂高
+    keywords: ["樂高 11390", "LEGO 11390"]
+    must_include: ["11390"]
+    original_price: 4799
+
+  - name: LEGO 77059 動物森友會 豆狸&粒狸 悠閒散步
+    category: 樂高
+    keywords: ["樂高 77059", "LEGO 77059"]
+    must_include: ["77059"]
+    original_price: 2299
+
+  - name: LEGO 72306 PlayStation
+    category: 樂高
+    keywords: ["樂高 72306", "LEGO 72306"]
+    must_include: ["72306"]
+    original_price: 5999
+
+  - name: LEGO 40649 放大版樂高人偶
+    category: 樂高
+    keywords: ["樂高 40649", "LEGO 40649"]
+    must_include: ["40649"]
+    exclude: ["單人偶", "小人偶"]
+    original_price: 1999   # 必買站標示的原價
+
+  # 漫畫範例（把前面的 # 拿掉就會開始追蹤）
+  # - name: 葬送的芙莉蓮 14
+  #   category: 漫畫
+  #   keywords: ["葬送的芙莉蓮 14"]
+  #   must_include: ["芙莉蓮", "14"]
+  #   exclude: ["全套", "1-13"]
+  #   original_price: 110
+
+  # 3C 範例
+  # - name: Panasonic 16公升除濕機 F-Y32GH
+  #   category: 3C
+  #   keywords: ["Panasonic F-Y32GH", "國際牌 F-Y32GH"]
+  #   must_include: ["Y32GH"]
+  #   min_price: 5000
+  #   max_price: 20000

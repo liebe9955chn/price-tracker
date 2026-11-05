@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商品比價紀錄</title>
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f4f4f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e2de;
+  --grid: #ecebe7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --accent: #2a78d6;
+  --good: #0a7d32;
+  --overall: #0b0b0b;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --other: #9a9994;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface-0: #121211; --surface-1: #1a1a19; --border: #2e2e2c; --grid: #262624;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e88;
+    --accent: #3987e5; --good: #4cc27a; --overall: #f0efec;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --other: #6f6e69;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211; --surface-1: #1a1a19; --border: #2e2e2c; --grid: #262624;
+  --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e88;
+  --accent: #3987e5; --good: #4cc27a; --overall: #f0efec;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --other: #6f6e69;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font: 15px/1.6 -apple-system, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+}
+main { max-width: 880px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.updated { color: var(--text-muted); font-size: 13px; margin-bottom: 20px; }
+details {
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+  margin-bottom: 12px; overflow: hidden;
+}
+summary {
+  list-style: none; cursor: pointer; padding: 14px 16px;
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center;
+}
+summary::-webkit-details-marker { display: none; }
+summary .name { font-weight: 600; }
+summary .now { text-align: right; font-variant-numeric: tabular-nums; }
+summary .now b { font-size: 20px; }
+summary .meta { grid-column: 1 / -1; color: var(--text-secondary); font-size: 13px; }
+summary .chev { color: var(--text-muted); font-size: 12px; }
+details[open] summary .chev::after { content: "收合"; }
+details:not([open]) summary .chev::after { content: "點開看走勢"; }
+.tag-low { color: var(--good); font-weight: 600; }
+.body { padding: 0 16px 16px; border-top: 1px solid var(--border); }
+.chart-wrap { position: relative; height: 300px; margin-top: 12px; }
+h3 { font-size: 14px; color: var(--text-secondary); margin: 18px 0 6px; font-weight: 600; }
+.list { margin: 0; padding: 0; list-style: none; }
+.list li {
+  display: grid; grid-template-columns: 76px 1fr auto; gap: 8px; align-items: baseline;
+  padding: 6px 0; border-bottom: 1px solid var(--grid); font-size: 14px;
+}
+.list .site { color: var(--text-secondary); font-size: 12px; }
+.list a { color: var(--text-primary); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.list a:hover { color: var(--accent); text-decoration: underline; }
+.list .price { font-variant-numeric: tabular-nums; font-weight: 600; }
+.empty { color: var(--text-muted); padding: 16px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>商品比價紀錄</h1>
+  <div class="updated" id="updated">讀取中…</div>
+  <div id="list"></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const fmt = n => n == null ? "—" : n.toLocaleString("zh-TW");
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let SITES = [];
+
+function siteColor(site) {
+  const i = SITES.indexOf(site);
+  return i < 0 || i > 7 ? css("--other") : css(`--s${i + 1}`);
+}
+const zhe = (price, orig) => (Math.round(price / orig * 100) / 10) + " 折";
+
+function card(p) {
+  const nowPrice = p.overall.length ? p.overall[p.overall.length - 1] : null;
+  const isLow = nowPrice != null && nowPrice === p.lowest;
+  const best = p.listings[0];
+  const meta = [
+    p.lowest != null ? `歷史最低 ${fmt(p.lowest)} 元（${esc(p.lowest_site)}，${esc(p.lowest_at)}）` : "",
+    p.original_price ? `原價 ${fmt(p.original_price)}` + (nowPrice != null ? `，現在 ${zhe(nowPrice, p.original_price)}` : "") : "",
+    ...p.tiers.map(t => `${esc(t.label)} ${fmt(t.price)}`),
+    p.baseline ? `30 天一般價格 ${fmt(Math.round(p.baseline))}` : "",
+    p.target_price ? `目標價 ${fmt(p.target_price)}` : "",
+  ].filter(Boolean).join("・");
+  const el = document.createElement("details");
+  el.id = p.id;
+  el.innerHTML = `
+    <summary>
+      <span class="name">${esc(p.name)}</span>
+      <span class="now">${nowPrice == null ? "目前沒有符合的商品" : `<b>${fmt(nowPrice)}</b> 元`}</span>
+      <span class="meta">${best ? esc(best.site) + "・" : ""}${isLow ? '<span class="tag-low">目前是歷史最低</span>・' : ""}${meta}
+        <span class="chev"></span></span>
+    </summary>
+    <div class="body">
+      <div class="chart-wrap"><canvas aria-label="${esc(p.name)} 價格走勢"></canvas></div>
+      <h3>目前各賣場價格（由低到高）</h3>
+      ${p.listings.length ? `<ul class="list">${p.listings.slice(0, 20).map(x => `
+        <li><span class="site">${esc(x.site)}</span>
+            <a href="${esc(x.url)}" target="_blank" rel="noopener" title="${esc(x.title)}">${esc(x.title)}</a>
+            <span class="price">${fmt(x.price)}</span></li>`).join("")}</ul>`
+        : '<div class="empty">這次沒有抓到符合條件的商品</div>'}
+    </div>`;
+  el.addEventListener("toggle", () => { if (el.open && !el._chart) el._chart = drawChart(el, p); });
+  return el;
+}
+
+function drawChart(el, p) {
+  const dot = p.times.length < 3 ? 4 : 0;  // 資料少時顯示圓點，不然看不到
+  const grid = css("--grid"), muted = css("--text-muted");
+  const datasets = [{
+    label: "全部最低", data: p.overall, borderColor: css("--overall"), backgroundColor: css("--overall"),
+    borderWidth: 2.5, pointRadius: dot, pointHoverRadius: 5, tension: 0, spanGaps: true,
+  }];
+  for (const [site, vals] of Object.entries(p.series)) {
+    datasets.push({
+      label: site, data: vals, borderColor: siteColor(site), backgroundColor: siteColor(site),
+      borderWidth: 2, pointRadius: dot, pointHoverRadius: 5, tension: 0, spanGaps: true,
+    });
+  }
+  const refs = p.tiers.map(t => [t.label, t.price]);
+  if (p.target_price) refs.push(["目標價", p.target_price]);
+  refs.forEach(([label, v], i) => datasets.push({
+    label: `${label} ${fmt(v)}`, data: p.times.map(() => v), borderColor: muted, backgroundColor: muted,
+    borderDash: i % 2 ? [2, 3] : [6, 4], borderWidth: 1, pointRadius: 0, pointHoverRadius: 0, isRef: true,
+  }));
+  return new Chart(el.querySelector("canvas"), {
+    type: "line",
+    data: { labels: p.times.map(t => t.slice(5)), datasets },
+    options: {
+      maintainAspectRatio: false, animation: false,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: muted, maxTicksLimit: 6, maxRotation: 0 } },
+        y: { grid: { color: grid }, border: { display: false },
+             ticks: { color: muted, callback: v => fmt(v) } },
+      },
+      plugins: {
+        legend: { position: "bottom", labels: { color: css("--text-secondary"), boxWidth: 12, boxHeight: 2 } },
+        tooltip: {
+          itemSort: (a, b) => (a.raw ?? 1e12) - (b.raw ?? 1e12),
+          filter: i => i.raw != null && !i.dataset.isRef,
+          callbacks: { label: c => ` ${c.dataset.label}：${fmt(c.raw)} 元` },
+        },
+      },
+    },
+  });
+}
+
+fetch("data.json?t=" + Date.now()).then(r => r.json()).then(d => {
+  SITES = d.sites;
+  document.getElementById("updated").textContent = `最後更新：${d.updated}（台灣時間，每天 09:30、15:00、21:00 更新）`;
+  const list = document.getElementById("list");
+  d.products.forEach(p => list.appendChild(card(p)));
+  const target = location.hash && document.querySelector(location.hash);
+  if (target) { target.open = true; target.scrollIntoView(); }
+}).catch(() => {
+  document.getElementById("updated").textContent = "還沒有資料，等第一次自動執行完成後再來看。";
+});
+</script>
+</body>
+</html>
