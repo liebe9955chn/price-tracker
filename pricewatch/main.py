@@ -67,7 +67,7 @@ def fetch_all(keywords: list[str], run_ok: dict) -> list[Listing]:
         for kw in keywords:
             try:
                 for x in fn(kw):
-                    key = (x.site, x.url or x.title, x.price)
+                    key = (x.site, x.title.strip(), x.price)
                     if key not in seen:
                         seen.add(key)
                         out.append(x)

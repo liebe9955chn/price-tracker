@@ -2,14 +2,29 @@
 from __future__ import annotations
 
 import re
+import unicodedata
+
+
+# 常見異體字、寫法差異，比對時視為同一個字
+_VARIANTS = str.maketrans({
+    "致": "緻", "臺": "台", "裏": "裡", "着": "著", "綫": "線", "峯": "峰", "爲": "為",
+    "衆": "眾", "啓": "啟", "汙": "污", "羣": "群", "麪": "麵", "牀": "床", "鷄": "雞",
+    "眞": "真", "册": "冊", "銹": "鏽", "濕": "溼", "週": "周", "游": "遊", "噁": "惡",
+    "　": " ",
+})
+
+
+def normalize(text: str) -> str:
+    """統一全形半形、大小寫、異體字，讓比對不會因為寫法不同而漏掉。"""
+    return unicodedata.normalize("NFKC", str(text)).lower().translate(_VARIANTS)
 
 
 def _contains(title: str, word: str) -> bool:
-    word = str(word)
+    word, title = normalize(word), normalize(title)
     if word.isdigit():
         # 純數字：前後不能緊接其他數字（40817 不會比對到 140817 或 408170）
         return re.search(rf"(?<!\d){re.escape(word)}(?!\d)", title) is not None
-    return word.lower() in title.lower()
+    return word in title
 
 
 def match_reason(title: str, product: dict, global_exclude: list[str]) -> str | None:

@@ -214,12 +214,41 @@ def _normalize_store(store: str) -> str:
     return store
 
 
+class BlockedError(RuntimeError):
+    """網站要求人機驗證，暫時擋住自動查詢。"""
+
+
+def _biggo_page(keyword: str, page: int) -> dict:
+    url = f"https://biggo.com.tw/s/{quote(keyword)}/?p={page}"
+    html = _get(url).text
+    if re.search(r"<title>\s*Verify to Continue", html):
+        raise BlockedError("BigGo 暫時擋住自動查詢（要求人機驗證）")
+    return _decode_after(_next_flight_text(html), '"ssrData":') or {}
+
+
 def biggo(keyword: str) -> list[Listing]:
     out = []
-    for page in (1, 2, 3):
-        url = f"https://biggo.com.tw/s/{quote(keyword)}/?p={page}"
-        txt = _next_flight_text(_get(url).text)
-        data = _decode_after(txt, '"ssrData":') or {}
+    for page in (1, 2):  # 只查前 2 頁，減少被 BigGo 擋的機會
+        if page == 1:
+            # 被要求驗證或回傳空白時，等一下再試（10 秒、20 秒）
+            data, last_err = {}, None
+            for attempt in range(3):
+                try:
+                    data = _biggo_page(keyword, 1)
+                    if data.get("list"):
+                        break
+                except Exception as e:
+                    last_err = e
+                if attempt < 2:
+                    time.sleep(10 * (attempt + 1))
+            if not data.get("list") and last_err:
+                raise last_err
+        else:
+            time.sleep(2)
+            try:
+                data = _biggo_page(keyword, page)
+            except BlockedError:
+                break  # 第 2 頁被擋就算了，第 1 頁的結果照用
         items = data.get("list") or []
         for x in items:
             price = _to_int(x.get("price"))
@@ -234,6 +263,29 @@ def biggo(keyword: str) -> list[Listing]:
         if page >= (data.get("total_page") or 1) or not items:
             break
         time.sleep(1)
+    return out
+
+
+# ---------------- 飛比價格（BigGo 的備援，也有蝦皮） ----------------
+def feebee(keyword: str) -> list[Listing]:
+    from html import unescape
+    from urllib.parse import parse_qs, urlparse
+    html = _get(f"https://feebee.com.tw/s/?q={quote(keyword)}").text
+    out = []
+    for m in re.finditer(r'<li class="[^"]*js-item-container"(.*?)</li>', html, re.S):
+        block = m.group(1)
+        attr = dict(re.findall(r'data-([a-z-]+)="([^"]*)"', block[:3000]))
+        price = _to_int(attr.get("price"))
+        title = unescape(attr.get("title", ""))
+        store = unescape(attr.get("store", ""))
+        if not price or not title or "電子書" in store or "kobo" in store.lower():
+            continue
+        link = unescape(attr.get("url", ""))
+        found = re.search(r'data-compare-found-url="([^"]+)"', block)
+        if found:  # 取出商品在原網站的網址
+            q = parse_qs(urlparse(unescape(found.group(1))).query)
+            link = (q.get("url") or [link])[0]
+        out.append(Listing(_normalize_store(store), title, price, link))
     return out
 
 
@@ -260,4 +312,5 @@ ALL_SITES = {
     "誠品": eslite,
     "金石堂": kingstone,
     "BigGo（含蝦皮、iOPEN Mall、旋轉拍賣、博客來、讀冊）": biggo,
+    "飛比價格（含蝦皮）": feebee,
 }
