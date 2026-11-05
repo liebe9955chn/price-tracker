@@ -1,0 +1,44 @@
+name: 定期比價
+
+on:
+  schedule:
+    # GitHub 用的是 UTC 時間，台灣時間要減 8 小時
+    - cron: "30 1 * * *"    # 台灣 09:30
+    - cron: "0 7 * * *"     # 台灣 15:00
+    - cron: "0 13 * * *"    # 台灣 21:00
+  workflow_dispatch: {}   # 允許在 GitHub 網頁上手動按「Run workflow」立刻執行
+
+permissions:
+  contents: write
+
+concurrency:
+  group: price-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: 抓價格並通知
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m pricewatch.main
+
+      - name: 儲存價格紀錄
+        run: |
+          git config user.name "price-bot"
+          git config user.email "price-bot@users.noreply.github.com"
+          git add data docs
+          git diff --cached --quiet || git commit -m "更新價格 $(TZ=Asia/Taipei date '+%Y-%m-%d %H:%M')"
+          git push
