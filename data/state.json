@@ -1,0 +1,71 @@
+{
+  "products": {
+    "LEGO 40817 黃色行李箱": {
+      "empty_runs": 0,
+      "tier_notified": -1,
+      "lowest": 418,
+      "lowest_at": "2026-11-05 10:48",
+      "lowest_site": "iOPEN Mall",
+      "last_price": 418,
+      "last_checked": "2026-11-05 10:48"
+    },
+    "LEGO 11390 七龍珠 神龍與悟空": {
+      "empty_runs": 0,
+      "tier_notified": -1,
+      "lowest": 4300,
+      "lowest_at": "2026-11-05 10:48",
+      "lowest_site": "iOPEN Mall",
+      "last_price": 4300,
+      "last_checked": "2026-11-05 10:48"
+    },
+    "LEGO 77059 動物森友會 豆狸&粒狸 悠閒散步": {
+      "empty_runs": 0,
+      "tier_notified": 1,
+      "lowest": 1463,
+      "lowest_at": "2026-11-05 10:48",
+      "lowest_site": "酷澎 Coupang",
+      "last_price": 1463,
+      "last_checked": "2026-11-05 10:48"
+    },
+    "LEGO 72306 PlayStation": {
+      "empty_runs": 0,
+      "tier_notified": 0,
+      "lowest": 4150,
+      "lowest_at": "2026-11-05 10:48",
+      "lowest_site": "iOPEN Mall",
+      "last_price": 4150,
+      "last_checked": "2026-11-05 10:48"
+    },
+    "LEGO 40649 放大版樂高人偶": {
+      "empty_runs": 0,
+      "tier_notified": -1,
+      "lowest": 1550,
+      "lowest_at": "2026-11-05 10:48",
+      "lowest_site": "露天拍賣",
+      "last_price": 1550,
+      "last_checked": "2026-11-05 10:48"
+    }
+  },
+  "sites": {
+    "PChome 24h": {
+      "fails": 0
+    },
+    "momo": {
+      "fails": 0
+    },
+    "Yahoo購物中心": {
+      "fails": 0
+    },
+    "Yahoo拍賣": {
+      "fails": 0
+    },
+    "露天拍賣": {
+      "fails": 0
+    },
+    "BigGo（含蝦皮、iOPEN Mall、旋轉拍賣）": {
+      "fails": 0
+    }
+  },
+  "lego_list_prices": {},
+  "last_run": "2026-11-05 10:48"
+}
