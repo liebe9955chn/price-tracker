@@ -143,7 +143,37 @@ def ruten(keyword: str) -> list[Listing]:
     return out
 
 
-# ---------------- BigGo（含蝦皮、iOPEN Mall、旋轉拍賣等） ----------------
+# ---------------- 誠品線上 ----------------
+def eslite(keyword: str) -> list[Listing]:
+    url = ("https://athena.eslite.com/api/v2/search"
+           f"?q={quote(keyword)}&final_price=0,&sort=_weight_+desc&size=40&start=0")
+    out = []
+    for h in (_get(url).json().get("hits") or {}).get("hit") or []:
+        f = h.get("fields") or {}
+        if str(f.get("is_ebook")).lower() == "true":
+            continue
+        price = _to_int(f.get("final_price"))
+        if price and str(f.get("stock", "1")) != "0":
+            out.append(Listing("誠品", f.get("name", ""), price, f.get("url", "")))
+    return out
+
+
+# ---------------- 金石堂 ----------------
+def kingstone(keyword: str) -> list[Listing]:
+    html = _get(f"https://www.kingstone.com.tw/search/key/{quote(keyword)}").text
+    out = []
+    for unit in html.split('<li class="displayunit">')[1:]:
+        m = re.search(r'class="pdnamebox"><a href="([^"]+)">([^<]+)', unit)
+        pm = re.search(r'特價<b>([\d,]+)</b>元', unit)
+        if not m or not pm or 'class="book">電子書' in unit:
+            continue
+        title = re.sub(r"&amp;", "&", m.group(2)).strip()
+        link = "https://www.kingstone.com.tw" + m.group(1).replace("&amp;", "&").split("?")[0]
+        out.append(Listing("金石堂", title, _to_int(pm.group(1)), link))
+    return out
+
+
+# ---------------- BigGo（含蝦皮、iOPEN Mall、旋轉拍賣、博客來、讀冊等） ----------------
 # BigGo 的商店代碼對應到統一的網站名稱，跟直接抓的網站合併計算
 BIGGO_STORE = {
     "tw_mall_shopeemall": "蝦皮",
@@ -153,7 +183,14 @@ BIGGO_STORE = {
     "tw_ec_pchome24h": "PChome 24h",
     "tw_pec_momoshop": "momo",
     "tw_ec_yahoobuy": "Yahoo購物中心",
+    "tw_pec_ybuy": "Yahoo購物中心",
+    "tw_pec_books": "博客來",
+    "tw_pec_taaze": "讀冊",
+    "tw_ec_eslite": "誠品",
+    "tw_ec_sanmin": "三民書局",
 }
+# 電子書商店，一律不抓
+BIGGO_SKIP = ("tw_books_taaze", "tw_pec_kobo", "tw_pec_readmoo", "tw_pec_pubu", "tw_books_")
 
 
 def _normalize_store(store: str) -> str:
@@ -190,6 +227,8 @@ def biggo(keyword: str) -> list[Listing]:
                 continue
             nindex = x.get("nindex", "")
             store = (x.get("store") or {}).get("name") or nindex
+            if nindex.startswith(BIGGO_SKIP) or "電子書" in store:
+                continue
             site = BIGGO_STORE.get(nindex) or _normalize_store(store)
             out.append(Listing(site, x.get("title", ""), price, (x.get("purl") or "").strip()))
         if page >= (data.get("total_page") or 1) or not items:
@@ -218,5 +257,7 @@ ALL_SITES = {
     "Yahoo購物中心": yahoo_buy,
     "Yahoo拍賣": yahoo_bid,
     "露天拍賣": ruten,
-    "BigGo（含蝦皮、iOPEN Mall、旋轉拍賣）": biggo,
+    "誠品": eslite,
+    "金石堂": kingstone,
+    "BigGo（含蝦皮、iOPEN Mall、旋轉拍賣、博客來、讀冊）": biggo,
 }
