@@ -11,7 +11,8 @@ SITE_ORDER = ["PChome 24h", "momo", "Yahoo購物中心", "Yahoo拍賣", "蝦皮"
 OTHER = "其他"
 
 
-def build_report(products: list[dict], root: Path) -> None:
+def build_report(products: list[dict], root: Path, blocked: list[str] | None = None) -> None:
+    from .filters import site_blocked
     history = root / "data" / "history.csv"
     latest = json.loads((root / "data" / "latest.json").read_text(encoding="utf-8"))
     state = json.loads((root / "data" / "state.json").read_text(encoding="utf-8"))
@@ -20,6 +21,8 @@ def build_report(products: list[dict], root: Path) -> None:
     if history.exists():
         with history.open(encoding="utf-8") as fh:
             for r in csv.DictReader(fh):
+                if site_blocked(r["site"], blocked):
+                    continue
                 site = r["site"] if r["site"] in SITE_ORDER else OTHER
                 t, p = r["time"], int(r["price"])
                 cur = rows[r["product"]][t].get(site)

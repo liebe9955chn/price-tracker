@@ -76,3 +76,9 @@ def merge_category(product: dict, categories: dict) -> dict:
             merged["max_price"] = int(orig * merged["max_ratio"])
     merged.setdefault("rule", "discount" if orig else "baseline")
     return merged
+
+
+def site_blocked(site: str, blocked: list[str]) -> bool:
+    """網站名稱有「不採用的網站」清單裡的字就排除。"""
+    s = normalize(site)
+    return any(normalize(b) in s for b in blocked or [])

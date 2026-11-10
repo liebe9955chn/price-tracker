@@ -13,9 +13,9 @@ from pathlib import Path
 
 import yaml
 
-from .filters import _VARIANTS, match_reason
+from .filters import _VARIANTS, match_reason, site_blocked
 from .notify import esc, send_telegram
-from .sites import ALL_SITES, BlockedError
+from .sites import ALL_SITES, BACKED_UP, BlockedError
 
 ROOT = Path(__file__).resolve().parent.parent
 USED_WORDS = ["二手", "中古", "舊書", "書況", "無劃記", "九成新", "9成新", "95新", "蠻新", "已拆", "拆封", "近全新"]
@@ -60,7 +60,12 @@ def main() -> int:
                 raw += fn(kw)
                 ok = True
             except Exception as e:
-                reason = str(e) if isinstance(e, BlockedError) else "連線失敗或網站改版"
+                if name in BACKED_UP:
+                    reason = f"直接連線被擋，已改從{BACKED_UP[name]}取得（筆數可能比較少）"
+                elif isinstance(e, BlockedError):
+                    reason = str(e)
+                else:
+                    reason = "連線失敗或網站改版"
                 print(f"[{name}] 「{kw}」失敗：{e}")
             time.sleep(1)
         if not ok:
@@ -69,6 +74,8 @@ def main() -> int:
     seen, good = set(), []
     for x in sorted(raw, key=lambda x: x.price):
         if match_reason(x.title, rule, cfg.get("global_exclude") or []) is not None:
+            continue
+        if site_blocked(x.site, cfg.get("exclude_sites")):
             continue
         if CHINA_SELLER.search(x.title):  # 中國賣家常見寫法（多半是簡體書或代購）
             continue

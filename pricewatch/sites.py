@@ -35,6 +35,11 @@ def _get(url: str) -> requests.Response:
             )
             r.raise_for_status()
             return r
+        except requests.HTTPError as e:
+            if e.response is not None and e.response.status_code == 403:
+                raise  # 網站明確拒絕，重試也沒用
+            last = e
+            time.sleep(3 * (attempt + 1))
         except requests.RequestException as e:
             last = e
             time.sleep(3 * (attempt + 1))
@@ -302,6 +307,9 @@ def lego_list_price(model: str) -> int | None:
                 return price - diff if diff < 0 else price
     return None
 
+
+# 直接連線常被擋、但 BigGo / 飛比價格也有資料的網站：失敗時不發提醒
+BACKED_UP = {"momo": "BigGo、飛比價格"}
 
 ALL_SITES = {
     "PChome 24h": pchome,

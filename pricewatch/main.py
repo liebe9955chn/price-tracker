@@ -16,9 +16,9 @@ from pathlib import Path
 
 import yaml
 
-from .filters import match_reason, merge_category, price_ok
+from .filters import match_reason, merge_category, price_ok, site_blocked
 from .notify import esc, send_telegram
-from .sites import ALL_SITES, Listing, lego_list_price
+from .sites import ALL_SITES, BACKED_UP, Listing, lego_list_price
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "products.yaml"
@@ -47,12 +47,14 @@ def load_json(path: Path, default):
         return default
 
 
-def load_history() -> dict[str, list[tuple[datetime, int]]]:
-    """每個商品每次執行的「全部網站最低價」。"""
+def load_history(blocked: list[str] | None = None) -> dict[str, list[tuple[datetime, int]]]:
+    """每個商品每次執行的「全部網站最低價」（不採用的網站不算）。"""
     per = defaultdict(dict)
     if HISTORY.exists():
         with HISTORY.open(encoding="utf-8") as fh:
             for r in csv.DictReader(fh):
+                if site_blocked(r["site"], blocked):
+                    continue
                 t, p = r["time"], int(r["price"])
                 if t not in per[r["product"]] or p < per[r["product"]][t]:
                     per[r["product"]][t] = p
@@ -212,7 +214,18 @@ def main() -> int:
     now_dt = datetime.now(TW)
     now = now_dt.strftime(TFMT)
     DATA.mkdir(exist_ok=True)
-    history = load_history()
+    blocked = cfg.get("exclude_sites") or []
+    history = load_history(blocked)
+    # 歷史最低價如果來自後來不採用的網站，用剩下的紀錄重新算
+    for pname, ps in state["products"].items():
+        if ps.get("lowest_site") and site_blocked(ps["lowest_site"], blocked):
+            past = history.get(pname)
+            if past:
+                t, v = min(past, key=lambda tv: tv[1])
+                ps.update(lowest=v, lowest_at=t.strftime(TFMT), lowest_site="（重新計算）")
+            else:
+                for k in ("lowest", "lowest_at", "lowest_site"):
+                    ps.pop(k, None)
     new_file = not HISTORY.exists()
     latest_snapshot = {}
     run_ok: dict[str, tuple[bool, str]] = {}
@@ -229,8 +242,13 @@ def main() -> int:
             print(f"\n=== {name} ===")
             raw = fetch_all(kws, run_ok)
             good = [x for x in raw
-                    if match_reason(x.title, p, global_exclude) is None and price_ok(x.price, p)]
+                    if match_reason(x.title, p, global_exclude) is None and price_ok(x.price, p)
+                    and not site_blocked(x.site, cfg.get("exclude_sites"))]
             good.sort(key=lambda x: x.price)
+            # 沒有合理價格範圍時（例如查不到原價），排除低於中位數 4 成的價格（零件、其他規格）
+            if p.get("min_price") is None and len(good) >= 5:
+                median = statistics.median(x.price for x in good)
+                good = [x for x in good if x.price >= median * 0.4]
             print(f"  抓到 {len(raw)} 筆，符合條件 {len(good)} 筆")
 
             per_site: dict[str, Listing] = {}
@@ -289,7 +307,7 @@ def main() -> int:
             continue
         st["fails"] = st.get("fails", 0) + 1
         st["last_error"] = err[:200]
-        if st["fails"] == FAIL_ALERT_AFTER:
+        if st["fails"] == FAIL_ALERT_AFTER and site not in BACKED_UP:
             send_telegram(f"<b>【提醒】{esc(site)} 連續 {FAIL_ALERT_AFTER} 次抓取失敗</b>\n"
                           f"可能是網站改版或擋住了連線，需要修程式。\n錯誤：{esc(st.get('last_error', ''))}")
 
@@ -299,7 +317,7 @@ def main() -> int:
                                                  ensure_ascii=False, indent=1), encoding="utf-8")
 
     from .report import build_report
-    build_report(products, ROOT)
+    build_report(products, ROOT, blocked)
     return 0
 
 
